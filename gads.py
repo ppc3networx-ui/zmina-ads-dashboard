@@ -31,8 +31,10 @@ import google.auth
 from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.errors import GoogleAdsException
 
-API_VERSION = "v18"  # при необходимости обновить на актуальную версию API
 ADWORDS_SCOPE = "https://www.googleapis.com/auth/adwords"
+# version не фиксируем: библиотека google-ads сама подставляет актуальную
+# для установленной версии пакета (жёстко заданная версия со временем
+# устаревает и API её отключает - именно так упал первый запуск).
 
 
 def get_client() -> GoogleAdsClient:
@@ -59,7 +61,6 @@ def get_client() -> GoogleAdsClient:
         credentials=credentials,
         developer_token=developer_token,
         login_customer_id=login_customer_id.replace("-", "") if login_customer_id else None,
-        version=API_VERSION,
     )
 
 
