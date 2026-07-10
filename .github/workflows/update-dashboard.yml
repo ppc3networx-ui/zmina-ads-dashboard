@@ -1,0 +1,50 @@
+name: Update Google Ads dashboard
+
+# Кладите этот файл в репозитории по пути: .github/workflows/update-dashboard.yml
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # каждый день в 05:00 UTC (08:00 Киев). Поменять при желании.
+  workflow_dispatch: {}    # + кнопка "Run workflow" в GitHub для ручного запуска
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install google-ads
+
+      - name: Write service account key
+        run: echo '${{ secrets.GOOGLE_ADS_SA_KEY }}' > /tmp/sa.json
+
+      - name: Run sync.py + generate.py
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+          GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+          GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
+        run: |
+          python3 sync.py
+          python3 generate.py
+
+      - name: Remove service account key
+        if: always()
+        run: rm -f /tmp/sa.json
+
+      - name: Commit and push updated dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/ data/
+          git diff --quiet --cached || git commit -m "Автообновление дашборда $(date -u +%F)"
+          git push
