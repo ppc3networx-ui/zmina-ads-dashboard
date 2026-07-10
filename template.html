@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Google Ads - __PRODUCT_NAME__</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --accent:#2f6f4f;
+    --accent-dark:#234f38;
+    --accent-soft:#e6f0ea;
+    --bg:#f5f7f6;
+    --card:#ffffff;
+    --text:#1f2a24;
+    --muted:#6b7a72;
+    --border:#e3e8e5;
+    --red:#b3422f;
+    --green:#2f6f4f;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding:24px;
+  }
+  .wrap{max-width:1280px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+  header h1{margin:0;font-size:22px;color:var(--accent-dark)}
+  header .updated{color:var(--muted);font-size:13px}
+  .card{background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.05);border:1px solid var(--border)}
+  .card + .card{margin-top:16px}
+  h2{font-size:15px;margin:0 0 14px 0;color:var(--accent-dark)}
+
+  /* filters */
+  .filters .filter-row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px}
+  .filters .filter-row:last-child{margin-bottom:0}
+  .filter-group{display:flex;flex-direction:column;gap:6px;min-width:120px}
+  .filter-group.grow{flex:1;min-width:200px}
+  .filter-group label{font-size:12px;color:var(--muted);font-weight:600}
+  select, input[type=text], input[type=number], input[type=date]{
+    border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;
+    background:#fff;color:var(--text);font-family:inherit;
+  }
+  select:focus, input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  .date-range{display:flex;align-items:center;gap:6px}
+  .date-range span{color:var(--muted)}
+  .quick-btns{display:flex;gap:6px;margin-top:6px}
+  .quick-btns button, .btn-secondary{
+    border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 10px;
+    font-size:12px;cursor:pointer;color:var(--text);
+  }
+  .quick-btns button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-secondary{color:var(--accent-dark);font-weight:600}
+  .btn-secondary:hover{background:var(--accent-soft)}
+
+  /* metric cards */
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:20px 0}
+  .metric-card{padding:16px 18px}
+  .metric-card.key-metric{border:2px solid var(--accent);background:var(--accent-soft)}
+  .metric-label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  .metric-value{font-size:26px;font-weight:700;margin-top:6px;color:var(--text)}
+  .metric-card.key-metric .metric-value{color:var(--accent-dark)}
+  .metric-delta{font-size:12px;margin-top:6px;font-weight:600}
+  .metric-delta.pos{color:var(--green)}
+  .metric-delta.neg{color:var(--red)}
+  .metric-delta.flat{color:var(--muted)}
+
+  /* chart */
+  canvas{max-width:100%}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th, td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--border)}
+  th:first-child, td:first-child{text-align:left}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none;white-space:nowrap}
+  th:hover{color:var(--accent-dark)}
+  th.sorted{color:var(--accent-dark)}
+  th .arrow{font-size:10px;margin-left:3px;color:var(--accent)}
+  tbody tr:hover{background:var(--accent-soft)}
+  .table-note{font-size:11px;color:var(--muted);margin:-8px 0 12px 0}
+  .empty-row td{text-align:center;color:var(--muted);padding:20px}
+
+  .tables-grid{display:flex;flex-direction:column;gap:16px}
+
+  @media (max-width:640px){
+    body{padding:14px}
+    .cards-grid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Google Ads &middot; <span id="productName">__PRODUCT_NAME__</span></h1>
+    <div class="updated">Обновлено: <span id="updatedAt">-</span></div>
+  </header>
+
+  <div class="card filters">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Период</label>
+        <div class="date-range">
+          <input type="date" id="fDateFrom">
+          <span>-</span>
+          <input type="date" id="fDateTo">
+        </div>
+        <div class="quick-btns" id="quickBtns">
+          <button type="button" data-days="7">7д</button>
+          <button type="button" data-days="14">14д</button>
+          <button type="button" data-days="30" class="active">30д</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Тип кампании</label>
+        <select id="fType"><option value="">Все</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Страна</label>
+        <select id="fCountry"><option value="">Все</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Мин. кликов</label>
+        <input type="number" id="fMinClicks" min="0" step="1" value="0">
+      </div>
+      <div class="filter-group grow">
+        <label>Поиск по названию</label>
+        <input type="text" id="fSearch" placeholder="часть названия кампании...">
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Метрика графика</label>
+        <select id="fMetric">
+          <option value="cpa">CPA</option>
+          <option value="cost">Расход</option>
+          <option value="clicks">Клики</option>
+          <option value="impr">Показы</option>
+          <option value="conv">Конверсии</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Режим графика</label>
+        <select id="fMode">
+          <option value="sum">Сумма</option>
+          <option value="camp">По кампаниям</option>
+          <option value="country">По странам</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Кол-во элементов на графике</label>
+        <select id="fTopN">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>&nbsp;</label>
+        <button type="button" class="btn-secondary" id="fReset">Сбросить фильтры</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cards-grid" id="cardsGrid">
+    <div class="card metric-card key-metric" data-metric="cpa">
+      <div class="metric-label">CPA</div>
+      <div class="metric-value" id="mCpa">-</div>
+      <div class="metric-delta" id="mCpaDelta"></div>
+    </div>
+    <div class="card metric-card" data-metric="cost">
+      <div class="metric-label">Расход</div>
+      <div class="metric-value" id="mCost">-</div>
+      <div class="metric-delta" id="mCostDelta"></div>
+    </div>
+    <div class="card metric-card" data-metric="conv">
+      <div class="metric-label">Конверсии</div>
+      <div class="metric-value" id="mConv">-</div>
+      <div class="metric-delta" id="mConvDelta"></div>
+    </div>
+    <div class="card metric-card" data-metric="clicks">
+      <div class="metric-label">Клики</div>
+      <div class="metric-value" id="mClicks">-</div>
+      <div class="metric-delta" id="mClicksDelta"></div>
+    </div>
+    <div class="card metric-card" data-metric="ctr">
+      <div class="metric-label">CTR</div>
+      <div class="metric-value" id="mCtr">-</div>
+      <div class="metric-delta" id="mCtrDelta"></div>
+    </div>
+    <div class="card metric-card" data-metric="cpc">
+      <div class="metric-label">CPC</div>
+      <div class="metric-value" id="mCpc">-</div>
+      <div class="metric-delta" id="mCpcDelta"></div>
+    </div>
+    <div class="card metric-card" data-metric="impr">
+      <div class="metric-label">Показы</div>
+      <div class="metric-value" id="mImpr">-</div>
+      <div class="metric-delta" id="mImprDelta"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Динамика по дням</h2>
+    <canvas id="mainChart" height="90"></canvas>
+  </div>
+
+  <div class="tables-grid" style="margin-top:16px">
+    <div class="card">
+      <h2>CPA по странам</h2>
+      <table id="tblCountry">
+        <thead><tr>
+          <th data-key="country">Страна</th>
+          <th data-key="cost">Расход</th>
+          <th data-key="clicks">Клики</th>
+          <th data-key="impr">Показы</th>
+          <th data-key="conv">Конверсии</th>
+          <th data-key="ctr">CTR</th>
+          <th data-key="cpc">CPC</th>
+          <th data-key="cpa">CPA</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Разбивка по кампаниям</h2>
+      <table id="tblCamp">
+        <thead><tr>
+          <th data-key="name">Кампания</th>
+          <th data-key="type">Тип</th>
+          <th data-key="country">Страна</th>
+          <th data-key="cost">Расход</th>
+          <th data-key="clicks">Клики</th>
+          <th data-key="impr">Показы</th>
+          <th data-key="conv">Конверсии</th>
+          <th data-key="ctr">CTR</th>
+          <th data-key="cpc">CPC</th>
+          <th data-key="cpa">CPA</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Топ групп объявлений по расходу</h2>
+      <div class="table-note">За последние 30 дней (не зависит от выбранного периода на графике)</div>
+      <table id="tblGroups">
+        <thead><tr>
+          <th data-key="ag">Группа объявлений</th>
+          <th data-key="camp">Кампания</th>
+          <th data-key="cost">Расход</th>
+          <th data-key="clicks">Клики</th>
+          <th data-key="impr">Показы</th>
+          <th data-key="conv">Конверсии</th>
+          <th data-key="cpa">CPA</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const PRODUCT_NAME = __PRODUCT_NAME__;
+const DATA = __DATA_JSON__;
+
+document.getElementById('productName').textContent = PRODUCT_NAME;
+document.title = 'Google Ads - ' + PRODUCT_NAME;
+
+/* ============================== helpers ============================== */
+
+const fmtMoney0 = new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', maximumFractionDigits:0});
+const fmtMoney2 = new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtInt = new Intl.NumberFormat('en-US');
+
+function money0(n){ return isFinite(n) ? fmtMoney0.format(n) : '-'; }
+function money2(n){ return isFinite(n) ? fmtMoney2.format(n) : '-'; }
+function intFmt(n){ return isFinite(n) ? fmtInt.format(Math.round(n)) : '-'; }
+function pct(n){ return isFinite(n) ? (n*100).toFixed(2) + '%' : '-'; }
+
+function safeDiv(a, b){ return b > 0 ? a / b : NaN; }
+
+function typeOf(campName){
+  // Кампании без "_" (дефолтные имена Google Ads, например
+  // "Local store visits and promotions-Performance Max-1") типа в имени не несут.
+  return campName.includes('_') ? campName.split('_')[0] : 'Прочее';
+}
+
+/* ---- восстановление полных дат из MM-DD (год берём из updated) ---- */
+function buildFullDates(days, updatedIso){
+  const n = days.length;
+  const fullDates = new Array(n);
+  if(n === 0) return fullDates;
+  let year = new Date(updatedIso).getFullYear();
+  if(isNaN(year)) year = new Date().getFullYear();
+  for(let i = n - 1; i >= 0; i--){
+    const [mm] = days[i].split('-').map(Number);
+    if(i < n - 1){
+      const [nmm] = days[i+1].split('-').map(Number);
+      if(mm > nmm) year--; // переход через новый год при движении назад
+    }
+    fullDates[i] = days[i].split('-').map(p => p.padStart(2,'0'));
+    fullDates[i] = `${year}-${fullDates[i][0]}-${fullDates[i][1]}`;
+  }
+  return fullDates;
+}
+const FULL_DATES = buildFullDates(DATA.days, DATA.updated);
+
+document.getElementById('updatedAt').textContent = DATA.updated
+  ? new Date(DATA.updated).toLocaleString('ru-RU')
+  : '-';
+
+/* ============================== state ============================== */
+
+const state = {
+  fromIdx: 0,
+  toIdx: Math.max(0, DATA.days.length - 1),
+  type: '',
+  country: '',
+  minClicks: 0,
+  search: '',
+  metric: 'cpa',
+  mode: 'sum',
+  topN: 10,
+};
+
+let chart = null;
+const sortState = {
+  tblCountry: {key:'cost', dir:-1},
+  tblCamp: {key:'cost', dir:-1},
+  tblGroups: {key:'cost', dir:-1},
+};
+
+/* ============================== filter UI init ============================== */
+
+function initFilterOptions(){
+  const types = [...new Set(DATA.camps.map(typeOf))].sort();
+  const countries = [...new Set(DATA.countries)].sort();
+
+  const typeSel = document.getElementById('fType');
+  types.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t; o.textContent = t;
+    typeSel.appendChild(o);
+  });
+
+  const countrySel = document.getElementById('fCountry');
+  countries.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    countrySel.appendChild(o);
+  });
+
+  if(FULL_DATES.length){
+    document.getElementById('fDateFrom').value = FULL_DATES[state.fromIdx];
+    document.getElementById('fDateTo').value = FULL_DATES[state.toIdx];
+    document.getElementById('fDateFrom').min = FULL_DATES[0];
+    document.getElementById('fDateFrom').max = FULL_DATES[FULL_DATES.length-1];
+    document.getElementById('fDateTo').min = FULL_DATES[0];
+    document.getElementById('fDateTo').max = FULL_DATES[FULL_DATES.length-1];
+  }
+}
+
+function idxForFullDate(dateStr){
+  const i = FULL_DATES.indexOf(dateStr);
+  return i === -1 ? null : i;
+}
+
+/* ============================== filtering core ============================== */
+
+// множество campIdx, прошедших фильтры типа/страны/поиска (без учёта дат и minClicks)
+function campSetByTypeCountrySearch(){
+  const set = new Set();
+  const search = state.search.trim().toLowerCase();
+  DATA.camps.forEach((name, i) => {
+    if(state.type && typeOf(name) !== state.type) return;
+    if(state.country && DATA.countries[i] !== state.country) return;
+    if(search && !name.toLowerCase().includes(search)) return;
+    set.add(i);
+  });
+  return set;
+}
+
+// финальное множество campIdx с учётом minClicks в выбранном диапазоне дат
+function finalCampSet(fromIdx, toIdx){
+  const base = campSetByTypeCountrySearch();
+  if(state.minClicks <= 0) return base;
+  const clicksByCamp = new Map();
+  for(const row of DATA.rows){
+    const [ci, di, , , clicks] = row;
+    if(!base.has(ci)) continue;
+    if(di < fromIdx || di > toIdx) continue;
+    clicksByCamp.set(ci, (clicksByCamp.get(ci) || 0) + clicks);
+  }
+  const result = new Set();
+  base.forEach(ci => {
+    if((clicksByCamp.get(ci) || 0) >= state.minClicks) result.add(ci);
+  });
+  return result;
+}
+
+function filteredRows(fromIdx, toIdx, campSet){
+  return DATA.rows.filter(r => r[1] >= fromIdx && r[1] <= toIdx && campSet.has(r[0]));
+}
+
+function aggregate(rows){
+  const a = {cost:0, impr:0, clicks:0, conv:0, cval:0};
+  for(const r of rows){
+    a.cost += r[2]; a.impr += r[3]; a.clicks += r[4]; a.conv += r[5]; a.cval += r[6];
+  }
+  return a;
+}
+
+function derive(agg){
+  return {
+    cost: agg.cost,
+    impr: agg.impr,
+    clicks: agg.clicks,
+    conv: agg.conv,
+    cpa: safeDiv(agg.cost, agg.conv),
+    ctr: safeDiv(agg.clicks, agg.impr),
+    cpc: safeDiv(agg.cost, agg.clicks),
+  };
+}
+
+/* ============================== cards ============================== */
+
+const CARD_KEYS = {
+  cpa:   {val:'mCpa',   delta:'mCpaDelta',   fmt: v => money2(v.cpa),   lowerIsBetter:true},
+  cost:  {val:'mCost',  delta:'mCostDelta',  fmt: v => money0(v.cost),  lowerIsBetter:true},
+  conv:  {val:'mConv',  delta:'mConvDelta',  fmt: v => (Math.round(v.conv*100)/100).toLocaleString('ru-RU'), lowerIsBetter:false},
+  clicks:{val:'mClicks',delta:'mClicksDelta',fmt: v => intFmt(v.clicks), lowerIsBetter:false},
+  ctr:   {val:'mCtr',   delta:'mCtrDelta',   fmt: v => pct(v.ctr),      lowerIsBetter:false, pp:true},
+  cpc:   {val:'mCpc',   delta:'mCpcDelta',   fmt: v => money2(v.cpc),   lowerIsBetter:true},
+  impr:  {val:'mImpr',  delta:'mImprDelta',  fmt: v => intFmt(v.impr),  lowerIsBetter:false},
+};
+
+function renderDelta(elId, cur, prev, lowerIsBetter, isPP){
+  const el = document.getElementById(elId);
+  if(prev === null || !isFinite(prev) || prev === 0 || !isFinite(cur)){
+    el.textContent = 'нет данных за пред. период';
+    el.className = 'metric-delta flat';
+    return;
+  }
+  let diffText, good;
+  if(isPP){
+    const diffPP = (cur - prev) * 100;
+    good = diffPP >= 0 ? !lowerIsBetter : lowerIsBetter;
+    diffText = (diffPP >= 0 ? '+' : '') + diffPP.toFixed(2) + ' п.п.';
+  } else {
+    const diffPct = ((cur - prev) / Math.abs(prev)) * 100;
+    good = diffPct >= 0 ? !lowerIsBetter : lowerIsBetter;
+    diffText = (diffPct >= 0 ? '+' : '') + diffPct.toFixed(1) + '%';
+  }
+  el.textContent = diffText + ' к пред. периоду';
+  el.className = 'metric-delta ' + (good ? 'pos' : 'neg');
+}
+
+function updateCards(){
+  const campSet = finalCampSet(state.fromIdx, state.toIdx);
+  const curRows = filteredRows(state.fromIdx, state.toIdx, campSet);
+  const curVals = derive(aggregate(curRows));
+
+  const periodLen = state.toIdx - state.fromIdx + 1;
+  const prevTo = state.fromIdx - 1;
+  const prevFrom = prevTo - periodLen + 1;
+
+  let prevVals = null;
+  if(prevFrom >= 0){
+    const prevRows = filteredRows(prevFrom, prevTo, campSet);
+    prevVals = derive(aggregate(prevRows));
+  }
+
+  Object.entries(CARD_KEYS).forEach(([key, cfg]) => {
+    document.getElementById(cfg.val).textContent = cfg.fmt(curVals);
+    const curRaw = key === 'ctr' ? curVals.ctr : curVals[key === 'cpa' ? 'cpa' : key];
+    const prevRaw = prevVals ? (key === 'ctr' ? prevVals.ctr : prevVals[key === 'cpa' ? 'cpa' : key]) : null;
+    renderDelta(cfg.delta, curRaw, prevRaw, cfg.lowerIsBetter, !!cfg.pp);
+  });
+}
+
+/* ============================== chart ============================== */
+
+const PALETTE = ['#2f6f4f','#4f9d76','#8fbfa3','#c98f3f','#b3422f','#3f6fb3','#8a5fb3','#b3833f','#4f8fb3','#7fa363',
+                  '#9f5f9f','#5f9f9f','#9f7f5f','#5f7f9f','#9f5f7f','#7f9f5f','#5f5f9f','#9f9f5f','#5f9f7f','#9f7f9f'];
+
+function metricValue(agg, metric){
+  const d = derive(agg);
+  if(metric === 'cost') return d.cost;
+  if(metric === 'clicks') return d.clicks;
+  if(metric === 'impr') return d.impr;
+  if(metric === 'conv') return d.conv;
+  return d.cpa; // cpa по умолчанию
+}
+
+function renderChart(){
+  const campSet = finalCampSet(state.fromIdx, state.toIdx);
+  const rows = filteredRows(state.fromIdx, state.toIdx, campSet);
+  const labels = FULL_DATES.slice(state.fromIdx, state.toIdx + 1).map(d => d.slice(5));
+
+  let datasets = [];
+
+  if(state.mode === 'sum'){
+    const perDay = new Array(state.toIdx - state.fromIdx + 1).fill(null).map(() => ({cost:0,impr:0,clicks:0,conv:0,cval:0}));
+    for(const r of rows){
+      const pos = r[1] - state.fromIdx;
+      perDay[pos].cost += r[2]; perDay[pos].impr += r[3]; perDay[pos].clicks += r[4]; perDay[pos].conv += r[5];
+    }
+    datasets = [{
+      label: PRODUCT_NAME,
+      data: perDay.map(a => metricValue(a, state.metric)),
+      borderColor: '#2f6f4f',
+      backgroundColor: '#2f6f4f22',
+      tension: 0.25,
+      fill: true,
+      pointRadius: 2,
+    }];
+  } else {
+    // группировка по кампаниям или странам
+    const groupKeyFor = ci => state.mode === 'camp' ? ci : DATA.countries[ci];
+    const groupTotals = new Map(); // key -> {cost,impr,clicks,conv}
+    const perGroupPerDay = new Map(); // key -> array per day
+
+    const nDays = state.toIdx - state.fromIdx + 1;
+    for(const r of rows){
+      const key = groupKeyFor(r[0]);
+      if(!perGroupPerDay.has(key)){
+        perGroupPerDay.set(key, new Array(nDays).fill(null).map(() => ({cost:0,impr:0,clicks:0,conv:0})));
+        groupTotals.set(key, {cost:0,impr:0,clicks:0,conv:0});
+      }
+      const pos = r[1] - state.fromIdx;
+      const arr = perGroupPerDay.get(key)[pos];
+      arr.cost += r[2]; arr.impr += r[3]; arr.clicks += r[4]; arr.conv += r[5];
+      const tot = groupTotals.get(key);
+      tot.cost += r[2]; tot.impr += r[3]; tot.clicks += r[4]; tot.conv += r[5];
+    }
+
+    const ranked = [...groupTotals.entries()]
+      .sort((a,b) => metricValue(b[1], state.metric) - metricValue(a[1], state.metric))
+      .slice(0, state.topN);
+
+    datasets = ranked.map(([key], i) => {
+      const label = state.mode === 'camp' ? DATA.camps[key] : key;
+      const perDay = perGroupPerDay.get(key);
+      return {
+        label,
+        data: perDay.map(a => metricValue(a, state.metric)),
+        borderColor: PALETTE[i % PALETTE.length],
+        backgroundColor: PALETTE[i % PALETTE.length] + '22',
+        tension: 0.25,
+        fill: false,
+        pointRadius: 1.5,
+      };
+    });
+  }
+
+  const metricLabel = {cpa:'CPA', cost:'Расход', clicks:'Клики', impr:'Показы', conv:'Конверсии'}[state.metric];
+
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById('mainChart'), {
+    type: 'line',
+    data: {labels, datasets},
+    options: {
+      responsive: true,
+      interaction: {mode: 'index', intersect: false},
+      plugins: {
+        legend: {display: state.mode !== 'sum', position: 'bottom', labels:{boxWidth:10, font:{size:11}}},
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              if(state.metric === 'cost' || state.metric === 'cpa') return `${ctx.dataset.label}: ${money2(v)}`;
+              return `${ctx.dataset.label}: ${intFmt(v)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          title: {display:true, text: metricLabel},
+          ticks: {
+            callback: v => (state.metric === 'cost' || state.metric === 'cpa') ? money0(v) : intFmt(v)
+          }
+        }
+      }
+    }
+  });
+}
+
+/* ============================== tables ============================== */
+
+function buildCountryRows(){
+  const campSet = finalCampSet(state.fromIdx, state.toIdx);
+  const rows = filteredRows(state.fromIdx, state.toIdx, campSet);
+  const byCountry = new Map();
+  for(const r of rows){
+    const country = DATA.countries[r[0]];
+    if(!byCountry.has(country)) byCountry.set(country, {cost:0,impr:0,clicks:0,conv:0});
+    const a = byCountry.get(country);
+    a.cost += r[2]; a.impr += r[3]; a.clicks += r[4]; a.conv += r[5];
+  }
+  return [...byCountry.entries()].map(([country, a]) => ({
+    country, ...a, ctr: safeDiv(a.clicks, a.impr), cpc: safeDiv(a.cost, a.clicks), cpa: safeDiv(a.cost, a.conv),
+  }));
+}
+
+function buildCampRows(){
+  const campSet = finalCampSet(state.fromIdx, state.toIdx);
+  const rows = filteredRows(state.fromIdx, state.toIdx, campSet);
+  const byCamp = new Map();
+  for(const r of rows){
+    const ci = r[0];
+    if(!byCamp.has(ci)) byCamp.set(ci, {cost:0,impr:0,clicks:0,conv:0});
+    const a = byCamp.get(ci);
+    a.cost += r[2]; a.impr += r[3]; a.clicks += r[4]; a.conv += r[5];
+  }
+  return [...byCamp.entries()].map(([ci, a]) => ({
+    name: DATA.camps[ci], type: typeOf(DATA.camps[ci]), country: DATA.countries[ci],
+    ...a, ctr: safeDiv(a.clicks, a.impr), cpc: safeDiv(a.cost, a.clicks), cpa: safeDiv(a.cost, a.conv),
+  }));
+}
+
+function buildGroupRows(){
+  const campSet = campSetByTypeCountrySearch();
+  return DATA.groups
+    .filter(g => campSet.has(g[0]))
+    .filter(g => g[4] >= state.minClicks)
+    .map(g => ({
+      camp: DATA.camps[g[0]], ag: g[1], cost: g[2], impr: g[3], clicks: g[4], conv: g[5],
+      cpa: safeDiv(g[2], g[5]),
+    }));
+}
+
+function sortRows(rows, key, dir){
+  return [...rows].sort((a, b) => {
+    const av = a[key], bv = b[key];
+    if(typeof av === 'string') return av.localeCompare(bv) * dir;
+    const an = isFinite(av) ? av : -Infinity;
+    const bn = isFinite(bv) ? bv : -Infinity;
+    return (an - bn) * dir;
+  });
+}
+
+function renderTable(tableId, rows, columns){
+  const table = document.getElementById(tableId);
+  const {key, dir} = sortState[tableId];
+  const sorted = sortRows(rows, key, dir);
+
+  table.querySelectorAll('th').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.key === key);
+    th.querySelector('.arrow')?.remove();
+    if(th.dataset.key === key){
+      const arrow = document.createElement('span');
+      arrow.className = 'arrow';
+      arrow.textContent = dir === 1 ? '(возр.)' : '(убыв.)';
+      th.appendChild(arrow);
+    }
+  });
+
+  const tbody = table.querySelector('tbody');
+  tbody.innerHTML = '';
+  if(sorted.length === 0){
+    const tr = document.createElement('tr');
+    tr.className = 'empty-row';
+    tr.innerHTML = `<td colspan="${columns.length}">Нет данных по выбранным фильтрам</td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+  for(const row of sorted){
+    const tr = document.createElement('tr');
+    tr.innerHTML = columns.map(c => `<td>${c.fmt(row[c.key], row)}</td>`).join('');
+    tbody.appendChild(tr);
+  }
+}
+
+const COLS_COUNTRY = [
+  {key:'country', fmt:v => v},
+  {key:'cost', fmt:money0},
+  {key:'clicks', fmt:intFmt},
+  {key:'impr', fmt:intFmt},
+  {key:'conv', fmt:v => (Math.round(v*100)/100).toLocaleString('ru-RU')},
+  {key:'ctr', fmt:pct},
+  {key:'cpc', fmt:money2},
+  {key:'cpa', fmt:money2},
+];
+
+const COLS_CAMP = [
+  {key:'name', fmt:v => v},
+  {key:'type', fmt:v => v},
+  {key:'country', fmt:v => v},
+  {key:'cost', fmt:money0},
+  {key:'clicks', fmt:intFmt},
+  {key:'impr', fmt:intFmt},
+  {key:'conv', fmt:v => (Math.round(v*100)/100).toLocaleString('ru-RU')},
+  {key:'ctr', fmt:pct},
+  {key:'cpc', fmt:money2},
+  {key:'cpa', fmt:money2},
+];
+
+const COLS_GROUPS = [
+  {key:'ag', fmt:v => v},
+  {key:'camp', fmt:v => v},
+  {key:'cost', fmt:money0},
+  {key:'clicks', fmt:intFmt},
+  {key:'impr', fmt:intFmt},
+  {key:'conv', fmt:v => (Math.round(v*100)/100).toLocaleString('ru-RU')},
+  {key:'cpa', fmt:money2},
+];
+
+function updateTables(){
+  renderTable('tblCountry', buildCountryRows(), COLS_COUNTRY);
+  renderTable('tblCamp', buildCampRows(), COLS_CAMP);
+  renderTable('tblGroups', buildGroupRows(), COLS_GROUPS);
+}
+
+document.querySelectorAll('table thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const tableId = th.closest('table').id;
+    const key = th.dataset.key;
+    const s = sortState[tableId];
+    if(s.key === key) s.dir *= -1; else { s.key = key; s.dir = -1; }
+    updateTables();
+  });
+});
+
+/* ============================== render all ============================== */
+
+function renderAll(){
+  updateCards();
+  renderChart();
+  updateTables();
+}
+
+/* ============================== events ============================== */
+
+function setActiveQuickBtn(days){
+  document.querySelectorAll('#quickBtns button').forEach(b => {
+    b.classList.toggle('active', Number(b.dataset.days) === days);
+  });
+}
+
+document.getElementById('quickBtns').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const days = Number(btn.dataset.days);
+  const lastIdx = DATA.days.length - 1;
+  state.toIdx = lastIdx;
+  state.fromIdx = Math.max(0, lastIdx - days + 1);
+  document.getElementById('fDateFrom').value = FULL_DATES[state.fromIdx];
+  document.getElementById('fDateTo').value = FULL_DATES[state.toIdx];
+  setActiveQuickBtn(days);
+  renderAll();
+});
+
+document.getElementById('fDateFrom').addEventListener('change', e => {
+  const idx = idxForFullDate(e.target.value);
+  if(idx !== null){ state.fromIdx = Math.min(idx, state.toIdx); setActiveQuickBtn(-1); renderAll(); }
+});
+document.getElementById('fDateTo').addEventListener('change', e => {
+  const idx = idxForFullDate(e.target.value);
+  if(idx !== null){ state.toIdx = Math.max(idx, state.fromIdx); setActiveQuickBtn(-1); renderAll(); }
+});
+
+document.getElementById('fType').addEventListener('change', e => { state.type = e.target.value; renderAll(); });
+document.getElementById('fCountry').addEventListener('change', e => { state.country = e.target.value; renderAll(); });
+document.getElementById('fMinClicks').addEventListener('input', e => { state.minClicks = Number(e.target.value) || 0; renderAll(); });
+
+let searchTimer = null;
+document.getElementById('fSearch').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { state.search = e.target.value; renderAll(); }, 200);
+});
+
+document.getElementById('fMetric').addEventListener('change', e => { state.metric = e.target.value; renderChart(); });
+document.getElementById('fMode').addEventListener('change', e => { state.mode = e.target.value; renderChart(); });
+document.getElementById('fTopN').addEventListener('change', e => { state.topN = Number(e.target.value); renderChart(); });
+
+document.getElementById('fReset').addEventListener('click', () => {
+  state.type = ''; state.country = ''; state.minClicks = 0; state.search = '';
+  state.metric = 'cpa'; state.mode = 'sum'; state.topN = 10;
+  state.fromIdx = 0; state.toIdx = Math.max(0, DATA.days.length - 1);
+
+  document.getElementById('fType').value = '';
+  document.getElementById('fCountry').value = '';
+  document.getElementById('fMinClicks').value = 0;
+  document.getElementById('fSearch').value = '';
+  document.getElementById('fMetric').value = 'cpa';
+  document.getElementById('fMode').value = 'sum';
+  document.getElementById('fTopN').value = 10;
+  if(FULL_DATES.length){
+    document.getElementById('fDateFrom').value = FULL_DATES[0];
+    document.getElementById('fDateTo').value = FULL_DATES[FULL_DATES.length-1];
+  }
+  setActiveQuickBtn(30);
+  renderAll();
+});
+
+/* ============================== init ============================== */
+
+initFilterOptions();
+renderAll();
+</script>
+</body>
+</html>
